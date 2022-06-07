@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+
+  <body>
+    <button onClick="addBot()">+ Bot</button>
+    <button onClick="delBot()">- Bot</button>
+    <button onClick="addOrder()">New Normal Order</button>
+    <button onClick="addOrder(true)">New VIP Order</button>
+
+    <p id="orders"></p>
+
+    <div>
+      <h1>bots</h1>
+      <div id="bots"></div>
+    </div>
+
+    <div style="display: flex; gap: 20px">
+      <div>
+        <h1>pending</h1>
+        <div id="pending-orders"></div>
+      </div>
+      <div>
+        <h1>processing</h1>
+        <div id="process-orders"></div>
+      </div>
+      <div>
+        <h1>completed</h1>
+        <div id="complete-orders"></div>
+      </div>
+    </div>
+  </body>
+  <script src="./index.js"></script>
+</html>
