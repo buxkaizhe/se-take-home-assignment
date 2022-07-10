@@ -1,65 +1,94 @@
-let orders = [];
-let bots = [];
-
-let orderid = 0;
-let botid = 0;
-
-function addOrder(vip = false) {
-  const order = {
-    orderid: orderid++,
-    vip: vip ? 1 : 0,
-    status: 0,
-  };
-  if (!vip) {
-    orders.push(order);
-  } else {
-    const first_normal =
-      orders.length == 0
-        ? 0
-        : orders.findIndex((o) => {
-            return o.status == 0 && o.vip == false;
-          });
-    orders.splice(first_normal < 0 ? 0 : first_normal, 0, order);
+class Order {
+  constructor(id, vip = 0) {
+    this.id = id;
+    this.status = 0;
+    this.vip = vip;
   }
 }
 
-function getHighestPrioOrder() {
-  return orders.length == 0 ? null : orders.find((o) => o.status == 0);
-}
+class Bot {
+  constructor(id) {
+    this.id = id;
+    this.orderId = null;
+    this.timer = null;
+  }
 
-function addBot() {
-  bots.push({ botid: botid++, orderid: null });
-}
-
-function delBot() {
-  const availBot = bots.filter((b) => !b.deleted);
-  const deletedBot =
-    availBot.length == 0
-      ? null
-      : availBot.reduce((a, b) => {
-          if (a.botid > b.botid) return a;
-          else return b;
-        });
-  if (!deletedBot) return;
-  deletedBot.deleted = true;
-  if (deletedBot.orderid != null) {
-    const affectedOrder = orders.find((o) => o.orderid == deletedBot.orderid);
-    affectedOrder.status = 0;
+  async processOrder(order) {
+    this.orderId = order.id;
+    order.status = 1;
+    const interval = 100;
+    order.secondsLeft = order.secondsLeft
+      ? order.secondsLeft
+      : order.vip == 1
+        ? 5 * 1000
+        : 10 * 1000;
+    this.timer = setInterval(() => {
+      order.secondsLeft -= interval;
+      if (order.secondsLeft <= 0) {
+        if (!this.deleted) {
+          order.status = 2;
+          this.orderId = null;
+        }
+        clearInterval(this.timer);
+      }
+      render();
+    }, interval);
   }
 }
 
-async function processOrder(bot) {
-  let currOrder = getHighestPrioOrder();
-  if (!currOrder) return;
-  bot.orderid = currOrder.orderid;
-  currOrder.status = 1;
-  setTimeout(() => {
-    if (!bot.deleted) {
-      currOrder.status = 2;
-      bot.orderid = null;
+class Main {
+  constructor() {
+    this.orderId = 0;
+    this.botId = 0;
+    this.bots = [];
+    this.orders = [];
+  }
+
+  addBot() {
+    this.bots.push(new Bot(this.botId++));
+    render();
+  }
+
+  removeBot() {
+    const tbrBot = this.bots
+      .filter((b) => !b.deleted)
+      .reduce((a, b) => {
+        return a.id > b.id ? a : b;
+      });
+    if (!tbrBot) return;
+    tbrBot.deleted = true;
+    if (tbrBot.orderId != null) {
+      clearInterval(tbrBot.timer);
+      this.orders.find((order) => order.id == tbrBot.orderId).status = 0;
     }
-  }, 10 * 1000);
+    render();
+  }
+
+  getHighestPrioOrder() {
+    return this.orders.find((o) => o.status == 0);
+  }
+
+  addOrder(vip = false) {
+    this.orders.push(new Order(this.orderId++, vip));
+    this.orders.sort((a, b) => {
+      if (a.vip == b.vip) return a.id - b.id;
+      else return b.vip - a.vip;
+    });
+    render();
+  }
+
+  processOrders() {
+    this.bots
+      .filter((b) => b.orderId == null && !b.deleted)
+      .forEach((bot) => {
+        const currOrder = this.getHighestPrioOrder();
+        if (!currOrder) return;
+        bot.processOrder(currOrder);
+      });
+  }
 }
+
+const main = new Main();
 
 function render() {
   const botcontainer = document.getElementById("bots");
@@ -70,25 +99,26 @@ function render() {
     pendings.innerHTML =
     processs.innerHTML =
     completes.innerHTML =
-      "";
+    "";
 
-  bots.forEach((b) => {
+  main.bots.forEach((b) => {
     let botNode = document.createElement("p");
     botNode.textContent =
-      b.orderid != null
-        ? `bot [${b.botid}] => order [${b.orderid}]`
-        : `bot [${b.botid}] waiting`;
+      b.orderId != null
+        ? `bot [${b.id}] => order [${b.orderId}]`
+        : `bot [${b.id}] waiting`;
     if (b.deleted) {
-      botNode.textContent = `bot [${b.botid}] deleted`;
+      botNode.textContent = `bot [${b.id}] deleted`;
     }
     botcontainer.appendChild(botNode);
   });
 
-  orders.forEach((o) => {
+  main.orders.forEach((o) => {
     let orderNode = document.createElement("p");
-    orderNode.textContent = `order [${o.orderid}]`;
-    orderNode.style.color = o.vip == 1 ? "#ff0000" : "#000000";
-    orderNode.style.fontWeight = o.vip == 1 ? "bold" : "normal";
+    orderNode.textContent =
+      `order [${o.id}] ` + (o.secondsLeft > 0 ? ` [${(o.secondsLeft / 1000).toFixed(2)}]` : "");
+    orderNode.style.color = o.vip ? "#ff0000" : "#000000";
+    orderNode.style.fontWeight = o.vip ? "bold" : "normal";
     if (o.status == 0) {
       pendings.appendChild(orderNode);
     } else if (o.status == 1) {
@@ -99,20 +129,4 @@ function render() {
   });
 }
 
-function startWork() {
-  if (bots.length > 0) {
-    bots
-      .filter((b) => b.orderid == null && !b.deleted)
-      .forEach((b) => {
-        processOrder(b);
-      });
-  }
-}
-
-setInterval(() => {
-  render();
-}, 10);
-
-setInterval(() => {
-  startWork();
-}, 100);
+setInterval(() => main.processOrders(), 10);
